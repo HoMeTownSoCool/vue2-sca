@@ -9,6 +9,14 @@
   <body></body>
   <script src="./v2sca.js"></script>
   <script>
-    console.log(V2sca, "V2sca");
+    // 响应式的数据变化，数据变化了，我可以监控到数据的变化，数据的取值和更改值
+    const v2sca = new V2sca({
+      data() {
+        return {
+          pageNum: 1,
+          pageSize: 10,
+        };
+      },
+    });
   </script>
 </html>
