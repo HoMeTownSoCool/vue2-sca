@@ -10,16 +10,21 @@
   <script src="./v2sca.js"></script>
   <script>
     // 响应式的数据变化，数据变化了，我可以监控到数据的变化，数据的取值和更改值
-    const v2 = new V2sca({
+    const vm = new V2sca({
       data() {
         return {
           pageNum: 1,
           pageSize: 10,
+          hobby: ["eat", "play", { name: "呵呵" }],
         };
       },
     });
-    v2.pageNum = 2;
-    console.log(v2.pageNum);
-    console.log(v2);
+    vm.pageNum = {
+      num: 1,
+      type: "01",
+    };
+    vm.pageNum.num = 10;
+    vm.hobby.push({ name: "滚" });
+    console.log(vm.hobby);
   </script>
 </html>

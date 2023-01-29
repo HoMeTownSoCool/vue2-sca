@@ -50,12 +50,59 @@
     return typeof key === "symbol" ? key : String(key);
   }
 
+  // 我希望能重写数组中的部分方法
+  var oldArrayProto = Array.prototype; // 获取数组的原型
+
+  // newArrayProto.__proto__ = oldArrayProto
+  var newArrayProto = Object.create(oldArrayProto);
+  // 找到所有的变异方法, content/slice都会不改变原来的数组
+  var methods = ["push", "pop", "shift", "unshift", "reverse", "splice", "sort"];
+  methods.forEach(function (method) {
+    newArrayProto[method] = function () {
+      var _oldArrayProto$method;
+      for (var _len = arguments.length, agrs = new Array(_len), _key = 0; _key < _len; _key++) {
+        agrs[_key] = arguments[_key];
+      }
+      // 这里重写了数组的方法
+      var result = (_oldArrayProto$method = oldArrayProto[method]).call.apply(_oldArrayProto$method, [this].concat(agrs)); // 内部调用原来的方法，函数的劫持， 切片编程
+      // 此时，还需要对新增的数据再次进行劫持
+      var inserted;
+      var ob = this.__ob__;
+      switch (method) {
+        case "push":
+        case "unshift":
+          inserted = agrs;
+          break;
+        case "splice":
+          inserted = agrs.slice(2);
+          break;
+      }
+      if (inserted) {
+        // 对新增的内容进行观测
+        ob.observerArray(inserted);
+      }
+      return result;
+    };
+  });
+
   var Observer = /*#__PURE__*/function () {
     function Observer(data) {
       _classCallCheck(this, Observer);
-      // Object.defineProperty只能劫持已经存在的属性，后增加的或者删除的，劫持不了
-      // 这就是为什么会出现$set 和 $delete这些api的原因
-      this.walk(data);
+      // 将__ob__变成不可枚举
+      Object.defineProperty(data, "__ob__", {
+        value: this,
+        enumerable: false
+      });
+      if (Array.isArray(data)) {
+        // 这里我们可以重写数组中的方法，7个变异方法，但是需要保留数组原有的方法，并且可以重写部分
+
+        data.__proto__ = newArrayProto;
+        this.observerArray(data);
+      } else {
+        // Object.defineProperty只能劫持已经存在的属性，后增加的或者删除的，劫持不了
+        // 这就是为什么会出现$set 和 $delete这些api的原因
+        this.walk(data);
+      }
     }
     /** 循环对象，对属性依次劫持 */
     _createClass(Observer, [{
@@ -64,6 +111,14 @@
         // 重新定义属性
         Object.keys(data).forEach(function (key) {
           return defineReactive(data, key, data[key]);
+        });
+      }
+      /** 观测数组 */
+    }, {
+      key: "observerArray",
+      value: function observerArray(data) {
+        data.forEach(function (item) {
+          return observe(item);
         });
       }
     }]);
@@ -81,6 +136,8 @@
       set: function set(newValue) {
         // 修改的时候，会执行
         if (newValue === value) return;
+        // 对用户传过来的数据进行再次代理
+        observe(newValue);
         value = newValue;
       }
     });
@@ -89,6 +146,10 @@
     // 对这个对象进行劫持
     if (_typeof(data) !== "object" || data === null) {
       return; // 只对对象进行劫持
+    }
+
+    if (data.__ob__ instanceof Observer) {
+      return data.__ob__;
     }
 
     // 如果一个对象被劫持过了，那就不需要再劫持了（需要判断一个对象是不是被接触过，用实例来判断）
